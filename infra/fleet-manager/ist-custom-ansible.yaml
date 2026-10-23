@@ -1,0 +1,128 @@
+# Custom Ansible in the Fleet Manager instance settings templates (IST) for
+# the design/automation/deployer nodes and the Govern node.
+#
+# FM runs its own provisioning tasks first (including "[install packages]"),
+# then these. The IST has two hooks: one before DSS is installed/started and
+# one after. This file holds the final version of each.
+#
+# History: a reprovision on 14.2.1 failed in FM's own
+# "[install packages]" task:
+#   Failed to download metadata for repo 'pgdg13': Cannot download repomd.xml:
+#   Cannot download repodata/repomd.xml: All mirrors were tried
+# The PostgreSQL 13 yum repo had gone end of life upstream. 14.5.1 no longer
+# needs it (it uses pgdg17 for Govern), so the fix was to reprovision on
+# 14.5.1. Our own Datadog task also had `disablerepo: "pgdg13"`, which is
+# pointless now and was removed from both the design and Govern templates.
+# Also, dnf loads metadata for every configured repo before it
+# applies disablerepo, so that line never protected anything anyway.
+#
+# Placeholders: <DATADOG_API_KEY>, <COMPANY_TAG>. The API key must come from
+# a secret store, never from this file.
+
+# ---------------------------------------------------------------------------
+# Hook 1: before DSS
+# ---------------------------------------------------------------------------
+# -------------------------
+# Conda Installation
+# -------------------------
+- name: Install Conda
+  block:
+    - name: Download Miniconda
+      get_url:
+        url: https://repo.anaconda.com/miniconda/Miniconda3-py39_24.7.1-0-Linux-x86_64.sh
+        dest: /tmp/install-miniconda.sh
+        checksum: sha256:2006a61abc8b4fd04de5eb92620e1f72bada713cc84b5b4899463095e1210556
+        mode: 0550
+- name: Create conda folder
+  become: True
+  file:
+    path: /opt/miniconda3
+    state: directory
+    owner: dataiku
+    mode: 755
+    recurse: yes
+- name: Run the installer
+  shell: /tmp/install-miniconda.sh -b -u -p /opt/miniconda3
+- name: Remove the installer
+  file:
+    state: absent
+    path: /tmp/install-miniconda.sh
+- name: Add miniconda bin to path
+  become: True
+  shell: echo 'export PATH=/opt/miniconda3/bin:$PATH' >> /etc/profile
+- name: conda - read permission for all
+  become: True
+  file:
+    path: /opt/miniconda3/bin/
+    mode: +x
+    recurse: yes
+# -------------------------
+# Datadog Agent Installation
+# -------------------------
+- name: Add Datadog YUM repository
+  become: True
+  copy:
+    dest: /etc/yum.repos.d/datadog.repo
+    mode: '0644'
+    content: |
+      [datadog]
+      name = Datadog
+      baseurl = https://yum.datadoghq.com/stable/7/$basearch/
+      enabled = 1
+      gpgcheck = 1
+      repo_gpgcheck = 0
+      gpgkey = https://keys.datadoghq.com/DATADOG_RPM_KEY_CURRENT.public
+               https://keys.datadoghq.com/DATADOG_RPM_KEY_FD4BF915.public
+- name: Import Datadog RPM GPG keys
+  become: True
+  rpm_key:
+    state: present
+    key: "{{ item }}"
+  loop:
+    - https://keys.datadoghq.com/DATADOG_RPM_KEY_CURRENT.public
+    - https://keys.datadoghq.com/DATADOG_RPM_KEY_FD4BF915.public
+- name: Clean DNF metadata
+  become: True
+  command: dnf clean all
+- name: Refresh DNF metadata (Datadog repo only)
+  become: True
+  command: dnf makecache --refresh --repo datadog
+  register: makecache_result
+  retries: 3
+  delay: 10
+  until: makecache_result.rc == 0
+- name: Install Datadog Agent
+  become: True
+  dnf:
+    name: datadog-agent
+    state: present
+    # disablerepo: "pgdg13"   <- removed after the pgdg13 failure, see header
+
+# ---------------------------------------------------------------------------
+# Hook 2: after DSS (separate field in the IST, shown here as a second
+# document)
+# ---------------------------------------------------------------------------
+---
+- name: Write Datadog agent configuration
+  become: true
+  copy:
+    dest: /etc/datadog-agent/datadog.yaml
+    owner: dd-agent
+    group: dd-agent
+    mode: '0640'
+    content: |
+      api_key: "<DATADOG_API_KEY>"
+      site: datadoghq.eu
+      tags:
+        - company:<COMPANY_TAG>
+        - service:dataiku
+        - env:prd
+      logs_enabled: true
+      process_config:
+        enabled: true
+- name: Enable and start Datadog agent
+  become: true
+  systemd:
+    name: datadog-agent
+    enabled: true
+    state: started

@@ -1,0 +1,184 @@
+# eksctl ClusterConfig used by DSS to (re)create the prod EKS cluster.
+#
+# This is the version agreed when the cluster had to be
+# recreated (docs/runbooks/eks-cluster-stop-and-recreate.md). DSS keeps its
+# own copy in the cluster's exec directory on the DSS host
+# (/data/dataiku/dss_data/clusters/<cluster>/exec/) and in the cluster
+# settings (Administration > Clusters). DSS shows a warning on this field:
+#   "Use YAML. If you use advanced configuration, presets will not be used."
+# With a full YAML config DSS does not apply its presets on top, so anything
+# the presets would add (reportedly this can include the NVIDIA device plugin
+# and autoscaler wiring) is your responsibility. We did not
+# verify exactly which presets were skipped.
+#
+# Changes from the config that was in place before (which still described the
+# cluster as it was years earlier):
+#   - gpu-workers: p3.2xlarge -> g5.2xlarge. p3 is decommissioned. V100 16 GB /
+#     61 GB RAM at ~USD 3.06/h vs A10G 24 GB / 32 GB RAM at ~USD 1.21/h
+#     (estimates). Trade-off: less system RAM.
+#   - nongpu-workers, api-workers: t3.large -> m6i.large. t3 runs on burst
+#     credits and throttles hard under sustained load.
+#   - api-workers: was minSize 0 / desiredCapacity 1 (contradictory). Now 0/0,
+#     scale from zero on demand.
+#   - system-nodes: t3.medium -> t3.large. These run CoreDNS, kube-proxy, the
+#     cluster autoscaler. min = max = 2 means the autoScaler addon policy can
+#     never do anything for this group. Harmless, left as is.
+#   - all groups: volumeType gp3, 3000 IOPS, 125 MB/s added. Without them
+#     eksctl creates gp2 even though the old live nodes were gp3.
+# The config only describes the eksctl-managed groups. Groups created with the
+# CLI (ml-workers, standard-workers, workshop-workers, the GPU groups) live
+# outside it (see infra/eks-nodegroups and infra/eks-gpu-nodegroups).
+#
+# Dependencies that must already exist (eksctl references them by ID and does
+# not create them): the VPC, the three private subnets, the control plane
+# security group under vpc.securityGroup and the security group under
+# securityGroups.attachIDs. The node instance roles are created by eksctl
+# because no instanceRoleARN is given.
+#
+# volumeType/volumeIOPS/volumeThroughput are valid for managed node groups
+# without a launch template. If a group ever switches to a launch template,
+# those fields must move into the template.
+#
+# Endpoint access is private only. That is why there is no kubectl from
+# laptops: the API server is reachable from inside the VPC only.
+---
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: "<EKS_CLUSTER_NAME>"
+  region: "eu-west-1"
+  version: "1.33"
+vpc:
+  id: "<VPC_ID>"
+  securityGroup: "<CONTROL_PLANE_SG_ID>"
+  clusterEndpoints:
+    publicAccess: false
+    privateAccess: true
+  subnets:
+    private:
+      eu-west-1a:
+        id: "<SUBNET_A>"
+      eu-west-1b:
+        id: "<SUBNET_B>"
+      eu-west-1c:
+        id: "<SUBNET_C>"
+managedNodeGroups:
+  - name: nongpu-workers
+    instanceType: m6i.large
+    privateNetworking: true
+    minSize: 1
+    desiredCapacity: 1
+    maxSize: 2
+    availabilityZones: ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+    volumeSize: 200
+    volumeType: gp3
+    volumeIOPS: 3000
+    volumeThroughput: 125
+    securityGroups:
+      attachIDs:
+        - "<SHARED_WORKERS_SG_ID>"
+    ssh:
+      allow: true
+      publicKeyName: "<EC2_KEY_PAIR_NAME>"
+    labels:
+      workerType: nongpu
+    taints:
+      - key: non-gpu
+        value: "true"
+        effect: NoSchedule
+    tags:
+      Environment: "prod"
+      Project: "dataiku"
+      Application: "eks-nongpu-workers"
+    propagateASGTags: true
+    iam:
+      withAddonPolicies:
+        autoScaler: true
+  - name: gpu-workers
+    instanceType: g5.2xlarge
+    privateNetworking: true
+    minSize: 0
+    desiredCapacity: 0
+    maxSize: 1
+    availabilityZones: ["eu-west-1c", "eu-west-1b", "eu-west-1a"]
+    volumeSize: 200
+    volumeType: gp3
+    volumeIOPS: 3000
+    volumeThroughput: 125
+    securityGroups:
+      attachIDs:
+        - "<SHARED_WORKERS_SG_ID>"
+    ssh:
+      allow: true
+      publicKeyName: "<EC2_KEY_PAIR_NAME>"
+    labels:
+      workerType: gpu
+    taints:
+      - key: gpu
+        value: "true"
+        effect: NoSchedule
+    tags:
+      Environment: "prod"
+      Project: "dataiku"
+      Application: "eks-gpu-workers"
+    propagateASGTags: true
+    iam:
+      withAddonPolicies:
+        autoScaler: true
+  - name: api-workers
+    instanceType: m6i.large
+    privateNetworking: true
+    minSize: 0
+    desiredCapacity: 0
+    maxSize: 2
+    availabilityZones: ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+    volumeSize: 200
+    volumeType: gp3
+    volumeIOPS: 3000
+    volumeThroughput: 125
+    securityGroups:
+      attachIDs:
+        - "<SHARED_WORKERS_SG_ID>"
+    ssh:
+      allow: true
+      publicKeyName: "<EC2_KEY_PAIR_NAME>"
+    labels:
+      workerType: api
+    taints:
+      - key: api-workers
+        value: "true"
+        effect: NoSchedule
+    tags:
+      Environment: "prod"
+      Project: "dataiku"
+      Application: "eks-api-workers"
+    propagateASGTags: true
+    iam:
+      withAddonPolicies:
+        autoScaler: true
+  - name: system-nodes
+    instanceType: t3.large
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 2
+    privateNetworking: true
+    availabilityZones: ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+    labels:
+      workerType: system
+    ssh:
+      allow: true
+      publicKeyName: "<EC2_KEY_PAIR_NAME>"
+    volumeSize: 200
+    volumeType: gp3
+    volumeIOPS: 3000
+    volumeThroughput: 125
+    tags:
+      Environment: "prod"
+      Project: "dataiku"
+      Application: "eks-system-nodes"
+    iam:
+      withAddonPolicies:
+        autoScaler: true
+    securityGroups:
+      attachIDs:
+        - "<SHARED_WORKERS_SG_ID>"

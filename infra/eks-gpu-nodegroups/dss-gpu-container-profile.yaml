@@ -1,0 +1,55 @@
+# Settings for the DSS containerized execution profile that targets the GPU
+# node groups. Entered in Administration > Settings > Containerized execution
+# > (profile). This is a record of the field values, not a file DSS reads.
+#
+# The label/taint pair must match what create-nodegroup applied:
+#   --labels workerType=gpu
+#   --taints key=nvidia.com/gpu,value=Exists,effect=NO_SCHEDULE
+# All four GPU node groups (three g5, one g4dn) carry the same pair, so this
+# single profile can land on any of them. Kubernetes picks a node with free
+# capacity. Four profiles with the same selector would be four names for the
+# same rule.
+
+# Node selector: only schedule on GPU nodes
+nodeSelector:
+  workerType: gpu
+
+# Toleration: allowed onto nodes carrying the GPU taint.
+# The operator is case-sensitive in Kubernetes and must be "Exists" or
+# "Equal". DSS once submitted a pod with "exists" and Kubernetes rejected it:
+#   spec.tolerations[0].operator: Unsupported value: "exists":
+#   supported values: "Equal", "Exists"
+# With operator Exists the taint *value* is ignored, so "exists" vs "Exists"
+# in the taint value itself makes no difference.
+tolerations:
+  - key: "nvidia.com/gpu"
+    operator: "Exists"
+    effect: "NoSchedule"
+
+# Custom limit: request one GPU per container. Every GPU node has exactly one
+# GPU, so a second GPU pod waits for a free node ("Insufficient nvidia.com/gpu").
+customLimits:
+  nvidia.com/gpu: 1
+
+# Memory: the scheduler uses the request to place the pod, and the limit
+# only caps it. 500 MB request was in place.
+memoryRequestMB: 500
+# Limit must fit the smallest node the profile can land on, minus OS and
+# system pods. g5.2xlarge and g4dn.2xlarge have 32 GB, so about 30720 MB.
+# A limit above node RAM can never be satisfied.
+memoryLimitMB: 30720
+
+# Namespace note: a namespace template like dss-wk-${dssUserLogin} fails when
+# logins are email addresses, because "@" and "." are invalid in Kubernetes
+# (RFC 1123) names. DSS variable filters (tolower, toupper, default,
+# getornull, tojson, fromjson, formatdate, indent) cannot replace characters.
+# Tried and failed: inline transformations and ${projectKey}. Options left:
+# a static namespace, short alphanumeric logins, or per-user variables
+# defined in admin settings. The GPU profile we use creates per-user
+# namespaces of the form dss-ns-gpu-<prefix>-<sanitised user>-<n>, which DSS
+# generates itself and which work.
+
+# CUDA: the AL2023_x86_64_NVIDIA node AMI ships the NVIDIA driver and kernel
+# modules only. CUDA user-space libraries must be inside the container image,
+# which is why the DSS base image is built with --with-cuda
+# --cuda-version=11.8 (see infra/ecr/build_and_push_base_image.sh).

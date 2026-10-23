@@ -1,0 +1,16 @@
+{
+  "SecurityGroupIds": ["<EKS_CLUSTER_SG_ID>", "<FM_VN_DEFAULT_SG_ID>"],
+  "KeyName": "<EC2_KEY_PAIR_NAME>",
+  "BlockDeviceMappings": [
+    {
+      "DeviceName": "/dev/xvda",
+      "Ebs": {
+        "VolumeSize": 500,
+        "VolumeType": "gp3",
+        "Iops": 3000,
+        "Throughput": 125,
+        "DeleteOnTermination": true
+      }
+    }
+  ]
+}

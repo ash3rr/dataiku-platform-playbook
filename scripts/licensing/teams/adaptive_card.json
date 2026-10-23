@@ -1,0 +1,65 @@
+{
+  "type": "AdaptiveCard",
+  "version": "1.4",
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "Dataiku User Licence Check",
+      "wrap": true,
+      "weight": "Bolder",
+      "size": "Medium"
+    },
+    {
+      "type": "FactSet",
+      "facts": [
+        {
+          "title": "Current Full Designer Licences:",
+          "value": "@{triggerBody()?['full_designer_count']}"
+        },
+        {
+          "title": "Trial Full Designer Licences:",
+          "value": "@{triggerBody()?['trial_full_designer_count']}"
+        },
+        {
+          "title": "Technical Account Licences:",
+          "value": "@{triggerBody()?['technical_account_count']}"
+        },
+        {
+          "title": "Trial Technical Account Licences:",
+          "value": "@{triggerBody()?['trial_technical_account_count']}"
+        },
+        {
+          "title": "Total Non-Trial Users:",
+          "value": "@{triggerBody()?['total_non_trial_users']}"
+        },
+        {
+          "title": "Total Trial Users:",
+          "value": "@{triggerBody()?['total_trial_users']}"
+        },
+        {
+          "title": "AI Consumer & Reader Licences:",
+          "value": "@{triggerBody()?['ai_consumer_and_reader_count']}"
+        },
+        {
+          "title": "Trial AI Consumer & Reader Licences:",
+          "value": "@{triggerBody()?['trial_ai_consumer_and_reader_count']}"
+        }
+      ]
+    },
+    {
+      "type": "TextBlock",
+      "text": "@{triggerBody()?['status_message']}",
+      "wrap": true,
+      "color": "@{if(equals(triggerBody()?['threshold_reached'], true), 'attention', 'good')}",
+      "weight": "Bolder"
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.OpenUrl",
+      "title": "Manage Licences",
+      "url": "https://<DSS_HOST>/admin/"
+    }
+  ]
+}

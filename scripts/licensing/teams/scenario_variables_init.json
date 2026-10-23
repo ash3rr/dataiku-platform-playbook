@@ -1,0 +1,16 @@
+{
+  "attachments": [
+    {
+      "full_designer_count": 0,
+      "trial_full_designer_count": 0,
+      "technical_account_count": 0,
+      "trial_technical_account_count": 0,
+      "total_non_trial_users": 0,
+      "total_trial_users": 0,
+      "threshold_reached": false,
+      "status_message": "",
+      "ai_consumer_and_reader_count": 0,
+      "trial_ai_consumer_and_reader_count": 0
+    }
+  ]
+}

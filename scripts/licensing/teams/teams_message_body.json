@@ -1,0 +1,12 @@
+{
+  "full_designer_count": ${variables.full_designer_count},
+  "trial_full_designer_count": ${variables.trial_full_designer_count},
+  "technical_account_count": ${variables.technical_account_count},
+  "trial_technical_account_count": ${variables.trial_technical_account_count},
+  "total_non_trial_users": ${variables.total_non_trial_users},
+  "total_trial_users": ${variables.total_trial_users},
+  "threshold_reached": ${variables.threshold_reached},
+  "status_message": "${variables.status_message}",
+  "ai_consumer_and_reader_count": ${variables.ai_consumer_and_reader_count},
+  "trial_ai_consumer_and_reader_count": ${variables.trial_ai_consumer_and_reader_count}
+}

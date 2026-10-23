@@ -1,0 +1,112 @@
+{
+    "BlockDeviceMappings": [
+        {
+            "DeviceName": "/dev/xvda",
+            "Ebs": {
+                "Iops": 3000,
+                "VolumeSize": 200,
+                "VolumeType": "gp3",
+                "Throughput": 125
+            }
+        }
+    ],
+    "KeyName": "<EC2_KEY_PAIR_NAME>",
+    "TagSpecifications": [
+        {
+            "ResourceType": "instance",
+            "Tags": [
+                {
+                    "Key": "Name",
+                    "Value": "eks-gpu-t4-16gb-8vcpu-200gb-Node"
+                },
+                {
+                    "Key": "Application",
+                    "Value": "eks-gpu-t4-16gb-8vcpu-200gb"
+                },
+                {
+                    "Key": "Environment",
+                    "Value": "prod"
+                },
+                {
+                    "Key": "Project",
+                    "Value": "dataiku"
+                },
+                {
+                    "Key": "alpha.eksctl.io/nodegroup-name",
+                    "Value": "eks-gpu-t4-16gb-8vcpu-200gb"
+                },
+                {
+                    "Key": "alpha.eksctl.io/nodegroup-type",
+                    "Value": "managed"
+                }
+            ]
+        },
+        {
+            "ResourceType": "volume",
+            "Tags": [
+                {
+                    "Key": "Name",
+                    "Value": "eks-gpu-t4-16gb-8vcpu-200gb-Node"
+                },
+                {
+                    "Key": "Application",
+                    "Value": "eks-gpu-t4-16gb-8vcpu-200gb"
+                },
+                {
+                    "Key": "Environment",
+                    "Value": "prod"
+                },
+                {
+                    "Key": "Project",
+                    "Value": "dataiku"
+                },
+                {
+                    "Key": "alpha.eksctl.io/nodegroup-name",
+                    "Value": "eks-gpu-t4-16gb-8vcpu-200gb"
+                },
+                {
+                    "Key": "alpha.eksctl.io/nodegroup-type",
+                    "Value": "managed"
+                }
+            ]
+        },
+        {
+            "ResourceType": "network-interface",
+            "Tags": [
+                {
+                    "Key": "Name",
+                    "Value": "eks-gpu-t4-16gb-8vcpu-200gb-Node"
+                },
+                {
+                    "Key": "Application",
+                    "Value": "eks-gpu-t4-16gb-8vcpu-200gb"
+                },
+                {
+                    "Key": "Environment",
+                    "Value": "prod"
+                },
+                {
+                    "Key": "Project",
+                    "Value": "dataiku"
+                },
+                {
+                    "Key": "alpha.eksctl.io/nodegroup-name",
+                    "Value": "eks-gpu-t4-16gb-8vcpu-200gb"
+                },
+                {
+                    "Key": "alpha.eksctl.io/nodegroup-type",
+                    "Value": "managed"
+                }
+            ]
+        }
+    ],
+    "SecurityGroupIds": [
+        "<CLUSTER_SG_ID>",
+        "<SHARED_WORKERS_SG_ID>",
+        "<REMOTE_ACCESS_SG_ID>"
+    ],
+    "MetadataOptions": {
+        "HttpTokens": "required",
+        "HttpPutResponseHopLimit": 2
+    }
+}
